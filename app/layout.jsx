@@ -1,6 +1,6 @@
 import "./global.css";
-import Header from "./components/Header";
-import Footer from "./components/Footer";
+import Header from "../components/Header";
+import Footer from "../components/Footer";
 
 export const metadata = {
 	title: "CRUD APP",
@@ -12,7 +12,7 @@ export default function RootLayout({ children }) {
 		<html lang="en">
 			<body className=" dark:text-white light:bg-slate-50  text-slate-900 ">
 				<Header />
-				<main className="container mx-auto h-[50vh] ">{children}</main>
+				<main className="container mx-auto min-h-[70vh] ">{children}</main>
 				<Footer />
 			</body>
 		</html>
