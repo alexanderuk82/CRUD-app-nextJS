@@ -1,10 +1,21 @@
 "use server";
+import { getCollection } from "../lib/db";
+import bcrypt from "bcrypt";
+import { cookies } from "next/headers";
+import jwt from "jsonwebtoken";
+import { redirect } from "next/navigation";
 
-// Validation text input fields expresion with this
+// Validation text input fields expression with this
 
 function isAlphanumeric(str) {
 	return /^[a-zA-Z0-9]+$/.test(str);
 }
+
+// Logout action
+export const logoutUser = async (prevState, formData) => {
+	cookies().delete("HorokuApp");
+	redirect("/");
+};
 
 export const registerUser = async (prevState, formData) => {
 	const errors = {};
@@ -60,13 +71,39 @@ export const registerUser = async (prevState, formData) => {
 		};
 	}
 
+	// Before, to store the user in the database, we need to hash the password using bcrypt
+
+	const salt = await bcrypt.genSalt(10);
+	ourUser.password = await bcrypt.hash(ourUser.password, salt);
+
+	// Storing user in The Database
+
+	const userCollection = await getCollection("users"); //we build the collection name
+	const newUser = await userCollection.insertOne(ourUser); //we insert the user in the collection
+	const userId = newUser.insertedId.toString(); //we get the id of the user
+
+	// Creating a JWT token
+	const token = await jwt.sign(
+		{
+			id: userId,
+			username: ourUser.username,
+			exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 30
+		},
+		process.env.JWTSECRET
+	);
+
+	//Log the user in by giving them a cookie
+
+	cookies().set("HorokuApp", token, {
+		httpOnly: true,
+		sameSite: "strict",
+		maxAge: 60 * 60 * 24 * 30,
+		secure: true
+	});
+
 	// If no errors, return the user
 	return {
 		user: ourUser,
 		success: true
 	};
-
-	//Storing user in The Database
-
-	//Log the user in by giving them a cookie
 };
