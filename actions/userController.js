@@ -11,11 +11,78 @@ function isAlphanumeric(str) {
 	return /^[a-zA-Z0-9]+$/.test(str);
 }
 
+//============== LOGIN USER
+
+//Login action
+export const loginUser = async (prevState, formData) => {
+	const errorsFields = {
+		success: false,
+		message: "Invalid username/password"
+	};
+
+	// Get values from formData using formData.get()
+	const ourUser = {
+		username: formData.get("username"), // Use formData.get() to access form field values
+		password: formData.get("password") // Use formData.get() to access form field values
+	};
+
+	// Logging input to debug data
+	console.log("Received formData:", formData);
+	console.log("Processed user data:", ourUser);
+
+	// Check if values are strings and trim white spaces
+	if (typeof ourUser.username !== "string") ourUser.username = "";
+	if (typeof ourUser.password !== "string") ourUser.password = "";
+
+	//Connecting to DB collections users
+
+	const collection = await getCollection("users");
+	const user = await collection.findOne({ username: ourUser.username });
+
+	if (!user) {
+		return errorsFields;
+	}
+
+	//Checking password matching using Bcrypt
+
+	const matchOrNot = bcrypt.compareSync(ourUser.password, user.password);
+
+	if (!matchOrNot) {
+		return errorsFields;
+	}
+
+	// Creating a JWT token
+	const token = await jwt.sign(
+		{
+			id: user._id,
+			username: ourUser.username,
+			exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 30
+		},
+		process.env.JWTSECRET
+	);
+
+	//Log the user in by giving them a cookie
+
+	cookies().set("HorokuApp", token, {
+		httpOnly: true,
+		sameSite: "strict",
+		maxAge: 60 * 60 * 24 * 30,
+		secure: true
+	});
+
+	//Redirect to the home page
+	return redirect("/");
+};
+
+//============== LOGOUT USER
+
 // Logout action
 export const logoutUser = async (prevState, formData) => {
 	cookies().delete("HorokuApp");
 	redirect("/");
 };
+
+//============== REGISTER NEW USER ACCOUNT
 
 export const registerUser = async (prevState, formData) => {
 	const errors = {};
@@ -52,6 +119,15 @@ export const registerUser = async (prevState, formData) => {
 		errors.username = "Username is required";
 	}
 
+	//Verifying if username is already taken or exist
+
+	const userCollection = await getCollection("users"); //we build the collection name
+	const user = await userCollection.findOne({ username: ourUser.username });
+
+	if (user) {
+		errors.username = "Username already taken";
+	}
+
 	// Validate password (e.g., at least 6 characters)
 	if (ourUser.password.length < 6) {
 		errors.password = "Password must be at least 6 characters";
@@ -78,7 +154,6 @@ export const registerUser = async (prevState, formData) => {
 
 	// Storing user in The Database
 
-	const userCollection = await getCollection("users"); //we build the collection name
 	const newUser = await userCollection.insertOne(ourUser); //we insert the user in the collection
 	const userId = newUser.insertedId.toString(); //we get the id of the user
 
